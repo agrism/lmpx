@@ -360,7 +360,7 @@ class InventoryItem extends Entity
             'sku' => 1,
             'qoh' => 1,
             'cost' => 1,
-            'salePrice' => 1
+            'saleprice' => 1
         ];
     }
 
