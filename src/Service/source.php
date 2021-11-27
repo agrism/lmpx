@@ -1,7 +1,6 @@
 <?php
 //abstract base class for in-memory representation of various business entities.  The only item
 //we have implemented at this point is InventoryItem (see below).
-namespace App\Service;
 
 use RuntimeException as RuntimeException;
 
@@ -139,7 +138,7 @@ class DataStore
             throw new RuntimeException("Read of data store file $storePath failed.  Details:" . getLastError());
         }
         if ($rawData !== '') {
-            $this->_dataStore = unserialize($rawData, ['allowed_classes' => false]);
+            $this->_dataStore = unserialize($rawData, ['allowed_classes' => true]);
         } else {
             $this->_dataStore = null;
         }
@@ -231,7 +230,7 @@ class EntityManager
     public function create($entityName, $data, $fromStore = false)
     {
 
-        $entity = new  (__NAMESPACE__.'\\'.$entityName);
+        $entity = new $entityName;
         $entity->_entityName = $entityName;
         $entity->_data = $data;
         $entity->_em = Entity::getDefaultEntityManager();
@@ -362,12 +361,13 @@ class InventoryItem extends Entity
 
 function driver()
 {
-    $dataStorePath = __DIR__.'/../../public/data_store_file.data';
+    $dataStorePath =__DIR__ . '/../../public/data_store_file.data';
     $entityManager = new EntityManager($dataStorePath);
 
     Entity::setDefaultEntityManager($entityManager);
 
     //create five new Inventory items
+    /** @var InventoryItem $item1 */
     $item1 = Entity::getEntity('InventoryItem',
                                ['sku' => 'abc-4589', 'qoh' => 0, 'cost' => '5.67', 'salePrice' => '7.27']);
     $item2 = Entity::getEntity('InventoryItem',
@@ -383,7 +383,7 @@ function driver()
 
 
 
-    $item2->itemsReceived(2);
+    /*$item2->itemsReceived(2);
     $item3->itemsReceived(12);
     $item4->itemsReceived(20);
     $item5->itemsReceived(1);
@@ -391,9 +391,16 @@ function driver()
     $item3->itemsHaveShipped(5);
     $item4->itemsHaveShipped(16);
 
-    $item4->changeSalePrice(0.87);
+    $item4->changeSalePrice(0.87);*/
 
     $entityManager->updateStore();
+
+    var_dump($item1->qoh);
+
+    if ($item1->qoh < 0 )
+    {
+        throw new RuntimeException("asserted value of QOH cannot be smaller than 4");
+    }
 }
 
 driver();
