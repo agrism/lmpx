@@ -36,6 +36,12 @@ abstract class Entity
         }
     }
 
+    // added by EA extended, mandatory couple for __set() magic
+    public function __isset($variableName)
+    {
+        //
+    }
+
     //getter for properies and items in the underlying data array
     public function __get($variableName)
     {
@@ -147,11 +153,7 @@ class DataStore
     //get information
     public function get($item, $primary)
     {
-        if (isset($this->_dataStore[$item][$primary])) {
-            return $this->_dataStore[$item][$primary];
-        } else {
-            return null;
-        }
+        return $this->_dataStore[$item][$primary] ?? null;
     }
 
     //delete an item.
@@ -253,8 +255,9 @@ class EntityManager
         {
             $this->_dataStore->delete(get_class($entity),$oldPrimary);
             unset($this->_entityPrimaryToId[$oldPrimary]);
-            $this->_entityIdToPrimary[$entity->$id] = $newPrimary;
-            $this->_entityPrimaryToId[$newPrimary] = $entity->$id;
+            // fixed in two lines below $entity->$id
+            $this->_entityIdToPrimary[$entity->_id] = $newPrimary;
+            $this->_entityPrimaryToId[$newPrimary] = $entity->_id;
         }
         $entity->_data = $newData;
 
@@ -377,4 +380,4 @@ function driver()
 }
 
 driver();
-?>
+
