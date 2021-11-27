@@ -3,7 +3,7 @@
 //we have implemented at this point is InventoryItem (see below).
 namespace App\Service;
 
-use RuntimeException;
+use RuntimeException as RuntimeException;
 
 abstract class Entity
 {
@@ -139,7 +139,7 @@ class DataStore
             throw new RuntimeException("Read of data store file $storePath failed.  Details:" . getLastError());
         }
         if ($rawData !== '') {
-            $this->_dataStore = unserialize($rawData, true);
+            $this->_dataStore = unserialize($rawData, ['allowed_classes' => false]);
         } else {
             $this->_dataStore = null;
         }
@@ -211,22 +211,27 @@ class EntityManager
     {
         $this->_dataStore = new DataStore($storePath);
 
+
+
         $this->_nextId = 1;
 
         $itemTypes = $this->_dataStore->getItemTypes();
+
         foreach ($itemTypes as $itemType)
         {
-            $itemKeys = $this->_dataStore->getItemKeys($itemTypes);
+            $itemKeys = $this->_dataStore->getItemKeys($itemType);
             foreach ($itemKeys as $itemKey) {
-                $entity = $this->create($itemType, $this->_dataStore->get($itemType, $itemKey), true);
+                $this->create($itemType, $this->_dataStore->get($itemType, $itemKey), true);
             }
         }
+
     }
 
     //create an entity
     public function create($entityName, $data, $fromStore = false)
     {
-        $entity = new $entityName;
+
+        $entity = new  (__NAMESPACE__.'\\'.$entityName);
         $entity->_entityName = $entityName;
         $entity->_data = $data;
         $entity->_em = Entity::getDefaultEntityManager();
@@ -357,11 +362,12 @@ class InventoryItem extends Entity
 
 function driver()
 {
-    $dataStorePath = "data_store_file.data";
+    $dataStorePath = __DIR__.'/../../public/data_store_file.data';
     $entityManager = new EntityManager($dataStorePath);
-    Entity::setDefaultEntityManager($entityManager);
-    //create five new Inventory items
 
+    Entity::setDefaultEntityManager($entityManager);
+
+    //create five new Inventory items
     $item1 = Entity::getEntity('InventoryItem',
                                ['sku' => 'abc-4589', 'qoh' => 0, 'cost' => '5.67', 'salePrice' => '7.27']);
     $item2 = Entity::getEntity('InventoryItem',
@@ -374,6 +380,9 @@ function driver()
                                ['sku' => 'qws-6783', 'qoh' => 0, 'cost' => '3.00', 'salePrice' => '4.97']);
 
     $item1->itemsReceived(4);
+
+
+
     $item2->itemsReceived(2);
     $item3->itemsReceived(12);
     $item4->itemsReceived(20);
