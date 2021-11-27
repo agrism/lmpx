@@ -301,9 +301,9 @@ class EntityManager
         if (isset($this->_entityPrimaryToId[$primary])) {
             $id = $this->_entityPrimaryToId[$primary];
             return $this->_entities[$id];
-        } else {
-            return null;
         }
+
+        return null;
     }
 
     //Update the datastore to update itself and save.
@@ -382,19 +382,19 @@ function driver()
     /** @var InventoryItem $item1 */
     $item1 = Entity::getEntity(
         InventoryItem::class,
-        ['sku' => 'abc-4589', 'qoh' => 0, 'cost' => '5.67', 'saleprice' => '7.27']);
+        ['sku' => 'abc-4589', 'qoh' => 0, 'cost' => '5.67', 'salePrice' => '7.27']);
     $item2 = Entity::getEntity(
         InventoryItem::class,
-        ['sku' => 'hjg-3821', 'qoh' => 0, 'cost' => '7.89', 'saleprice' => '12.00']);
+        ['sku' => 'hjg-3821', 'qoh' => 0, 'cost' => '7.89', 'salePrice' => '12.00']);
     $item3 = Entity::getEntity(
         InventoryItem::class,
-        ['sku' => 'xrf-3827', 'qoh' => 0, 'cost' => '15.27', 'saleprice' => '19.99']);
+        ['sku' => 'xrf-3827', 'qoh' => 0, 'cost' => '15.27', 'salePrice' => '19.99']);
     $item4 = Entity::getEntity(
         InventoryItem::class,
-        ['sku' => 'eer-4521', 'qoh' => 0, 'cost' => '8.45', 'saleprice' => '1.03']);
+        ['sku' => 'eer-4521', 'qoh' => 0, 'cost' => '8.45', 'salePrice' => '1.03']);
     $item5 = Entity::getEntity(
         InventoryItem::class,
-        ['sku' => 'qws-6783', 'qoh' => 0, 'cost' => '3.00', 'saleprice' => '4.97']);
+        ['sku' => 'qws-6783', 'qoh' => 0, 'cost' => '3.00', 'salePrice' => '4.97']);
 
     $item1->itemsReceived(4);
 
