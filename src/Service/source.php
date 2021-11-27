@@ -1,8 +1,10 @@
 <?php
 //abstract base class for in-memory representation of various business entities.  The only item
 //we have implemented at this point is InventoryItem (see below).
+namespace App\Service;
 
 use RuntimeException as RuntimeException;
+use function PHPUnit\Framework\assertEquals;
 
 abstract class Entity
 {
@@ -24,18 +26,22 @@ abstract class Entity
     //setter for properties and items in the underlying data array
     public function __set($variableName, $value)
     {
-        if (array_key_exists($variableName, array_change_key_case($this->getMembers()))) {
+        if (
+            array_key_exists
+            (
+                $variableName,
+                array_change_key_case($this->getMembers())
+            )
+        ) {
             $newData = $this->_data;
             $newData[$variableName] = $value;
             $this->update($newData);
             $this->_data = $newData;
+        } elseif (property_exists($this, $variableName)) {
+            $this->$variableName = $value;
         } else {
-            if (property_exists($this, $variableName)) {
-                $this->$variableName = $value;
-            } else {
-                throw new RuntimeException("Set failed. Class " . get_class($this) .
-                                    " does not have a member named " . $variableName . ".");
-            }
+            throw new RuntimeException("Set failed. Class " . get_class($this) .
+                                " does not have a member named " . $variableName . ".");
         }
     }
 
@@ -48,17 +54,23 @@ abstract class Entity
     //getter for properties and items in the underlying data array
     public function __get($variableName)
     {
-        if (array_key_exists($variableName, array_change_key_case($this->getMembers()))) {
+        if (
+            array_key_exists
+            (
+                $variableName,
+                array_change_key_case($this->getMembers())
+            )
+        ) {
             $data = $this->read();
             return $data[$variableName];
-        } else {
-            if (property_exists($this, $variableName)) {
-                return $this->$variableName;
-            } else {
-                throw new RuntimeException("Get failed. Class " . get_class($this) .
-                                    " does not have a member named " . $variableName . ".");
-            }
         }
+
+        if (property_exists($this, $variableName)) {
+            return $this->$variableName;
+        }
+
+        throw new RuntimeException("Get failed. Class " . get_class($this) .
+                            " does not have a member named " . $variableName . ".");
     }
 
     public static function setDefaultEntityManager($em): void
@@ -321,15 +333,14 @@ class InventoryItem extends Entity
     }
 
     //We received new items, update the count.
-    public function itemsReceived($numberReceived)
+    public function itemsReceived($numberReceived): void
     {
 
         $newData = $this->_data;
         $current = $this->qoh;
-
         for($i = 1; $i <= $numberReceived; $i++) {
             //notifyWareHouse();  //Not implemented yet.
-            $newData['qoh'] = $current++;
+            $newData['qoh'] = ++$current;
         }
         $this->update($newData);
     }
@@ -337,8 +348,9 @@ class InventoryItem extends Entity
     public function changeSalePrice($salePrice): void
     {
         $newData = $this->_data;
-        // @todo used void method result
-        $newData['salePrice'] = $this->update($newData);
+
+        $newData['saleprice'] = $salePrice;
+        $this->update($newData);
     }
 
     public function getMembers(): array
@@ -368,22 +380,25 @@ function driver()
 
     //create five new Inventory items
     /** @var InventoryItem $item1 */
-    $item1 = Entity::getEntity('InventoryItem',
-                               ['sku' => 'abc-4589', 'qoh' => 0, 'cost' => '5.67', 'salePrice' => '7.27']);
-    $item2 = Entity::getEntity('InventoryItem',
-                               ['sku' => 'hjg-3821', 'qoh' => 0, 'cost' => '7.89', 'salePrice' => '12.00']);
-    $item3 = Entity::getEntity('InventoryItem',
-                               ['sku' => 'xrf-3827', 'qoh' => 0, 'cost' => '15.27', 'salePrice' => '19.99']);
-    $item4 = Entity::getEntity('InventoryItem',
-                               ['sku' => 'eer-4521', 'qoh' => 0, 'cost' => '8.45', 'salePrice' => '1.03']);
-    $item5 = Entity::getEntity('InventoryItem',
-                               ['sku' => 'qws-6783', 'qoh' => 0, 'cost' => '3.00', 'salePrice' => '4.97']);
+    $item1 = Entity::getEntity(
+        InventoryItem::class,
+        ['sku' => 'abc-4589', 'qoh' => 0, 'cost' => '5.67', 'saleprice' => '7.27']);
+    $item2 = Entity::getEntity(
+        InventoryItem::class,
+        ['sku' => 'hjg-3821', 'qoh' => 0, 'cost' => '7.89', 'saleprice' => '12.00']);
+    $item3 = Entity::getEntity(
+        InventoryItem::class,
+        ['sku' => 'xrf-3827', 'qoh' => 0, 'cost' => '15.27', 'saleprice' => '19.99']);
+    $item4 = Entity::getEntity(
+        InventoryItem::class,
+        ['sku' => 'eer-4521', 'qoh' => 0, 'cost' => '8.45', 'saleprice' => '1.03']);
+    $item5 = Entity::getEntity(
+        InventoryItem::class,
+        ['sku' => 'qws-6783', 'qoh' => 0, 'cost' => '3.00', 'saleprice' => '4.97']);
 
     $item1->itemsReceived(4);
 
-
-
-    /*$item2->itemsReceived(2);
+    $item2->itemsReceived(2);
     $item3->itemsReceived(12);
     $item4->itemsReceived(20);
     $item5->itemsReceived(1);
@@ -391,15 +406,59 @@ function driver()
     $item3->itemsHaveShipped(5);
     $item4->itemsHaveShipped(16);
 
-    $item4->changeSalePrice(0.87);*/
+    $item4->changeSalePrice(0.87);
 
     $entityManager->updateStore();
 
-    var_dump($item1->qoh);
 
-    if ($item1->qoh < 0 )
+    try {
+        assertEquals(4, $item1->qoh, "asserted value of QOH cannot be other than 4");
+    } catch (RuntimeException $r)
     {
-        throw new RuntimeException("asserted value of QOH cannot be smaller than 4");
+        echo $r->getMessage();
+    }
+
+    try {
+        assertEquals(2, $item2->qoh, "asserted value of QOH cannot be other than 2");
+    } catch (RuntimeException $r)
+    {
+        echo $r->getMessage();
+    }
+
+    try {
+        assertEquals(7, $item3->qoh, "asserted value of QOH cannot be other than 7");
+    } catch (RuntimeException $r)
+    {
+        echo $r->getMessage();
+    }
+
+    try {
+        assertEquals(4, $item4->qoh, "asserted value of QOH cannot be other than 4");
+    } catch (RuntimeException $r)
+    {
+        echo $r->getMessage();
+    }
+
+    try {
+        assertEquals(1, $item5->qoh, "asserted value of QOH cannot be other than 1");
+    } catch (RuntimeException $r)
+    {
+        echo $r->getMessage();
+    }
+
+
+    try {
+        assertEquals(1, $item5->qoh, "asserted value of QOH cannot be other than 1");
+    } catch (RuntimeException $r)
+    {
+        echo $r->getMessage();
+    }
+
+    try {
+        assertEquals(0.87, $item4->saleprice, "asserted value of salePrice cannot be other than 0.87");
+    } catch (RuntimeException $r)
+    {
+        echo $r->getMessage();
     }
 }
 
