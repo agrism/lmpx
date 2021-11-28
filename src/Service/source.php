@@ -433,10 +433,11 @@ class MailMessenger implements \SplObserver, MailMessengerInterface
 
     private function save(): void
     {
-        $message = wordwrap(serialize([
-                                          'sku' => $this->subject->updateResult['sku'],
-                                          'qoh' => $this->subject->updateResult['qoh'],
-                                      ])
+        $message = wordwrap(
+              json_encode([
+                              'sku'=>$this->subject->updateResult['sku'],
+                              'qoh'=>$this->subject->updateResult['qoh'],
+                          ], JSON_THROW_ON_ERROR)
             , 70, "\r\n");
         mail(self::MAIL_TO, self::QOH_DIPS_FIVE, $message, self::MAIL_HEADER);
 
@@ -444,10 +445,10 @@ class MailMessenger implements \SplObserver, MailMessengerInterface
         $result = file_put_contents
         (
             $this->loggerPath,
-            serialize([
-                          'sku' => $this->subject->updateResult['sku'],
-                          'qoh' => $this->subject->updateResult['qoh'],
-                      ]) .PHP_EOL, FILE_APPEND
+            json_encode([
+                            'sku'=>$this->subject->updateResult['sku'],
+                            'qoh'=>$this->subject->updateResult['qoh'],
+                        ], JSON_THROW_ON_ERROR) .PHP_EOL, FILE_APPEND
         );
         if ($result === null) {
             throw new RuntimeException("Write of data store file $this->loggerPath failed.");
