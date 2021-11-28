@@ -1,4 +1,5 @@
-### lampa.lv ###
+lampa.lv
+=====
 with phpUnit asserts
 composer update
 cd public  
