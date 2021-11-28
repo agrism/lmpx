@@ -3,7 +3,10 @@
 //we have implemented at this point is InventoryItem (see below).
 namespace App\Service;
 
-use RuntimeException as RuntimeException;
+use RuntimeException;
+use SplObserver;
+use SplSubject;
+
 use function PHPUnit\Framework\assertEquals;
 
 abstract class Entity
@@ -203,8 +206,11 @@ class DataStore
 }
 
 //This class managed in-memory entities and communicates with the storage class (DataStore in our case).
-class EntityManager
+class EntityManager implements \SplSubject
 {
+    private const MAIL_MESSENGER = 'MAIL_MESSENGER';
+
+    public array $updateResult = [];
 
     protected array $_entities = [];
 
@@ -218,14 +224,13 @@ class EntityManager
 
     protected $_dataStore = null;
 
+    private \SplObjectStorage $observers;
+    private string $observerTarget = '';
+
     public function __construct($storePath)
     {
         $this->_dataStore = new DataStore($storePath);
-
-
-
         $this->_nextId = 1;
-
         $itemTypes = $this->_dataStore->getItemTypes();
 
         foreach ($itemTypes as $itemType)
@@ -235,7 +240,7 @@ class EntityManager
                 $this->create($itemType, $this->_dataStore->get($itemType, $itemKey), true);
             }
         }
-
+        $this->observers = new \SplObjectStorage();
     }
 
     //create an entity
@@ -261,6 +266,7 @@ class EntityManager
     //update
     public function update($entity, $newData)
     {
+
         if ($newData === $entity->_data) {
             //Nothing to do
             return $entity;
@@ -277,7 +283,13 @@ class EntityManager
             $this->_entityIdToPrimary[$entity->_id] = $newPrimary;
             $this->_entityPrimaryToId[$newPrimary] = $entity->_id;
         }
+
+        if ($entity->_data['qoh'] >=5 && $newData['qoh'] < 5) {
+            $this->observerTarget = self::MAIL_MESSENGER;
+        }
         $entity->_data = $newData;
+        $this->updateResult = $newData;
+        $this->notify();
 
         return $entity;
     }
@@ -315,7 +327,136 @@ class EntityManager
         }
         $this->_dataStore->save();
     }
+
+    public function attach(SplObserver $observer): void
+    {
+        $this->observers->attach($observer);
+    }
+
+    public function detach(SplObserver $observer): void
+    {
+        $this->observers->detach($observer);
+    }
+
+    public function notify(): void
+    {
+        foreach ($this->observers as $observer) {
+            if ($this->observerTarget === self::MAIL_MESSENGER && $observer instanceof MailMessengerInterface) {
+                $observer->update($this);
+                $this->observerTarget = '';
+            } elseif ($observer instanceof MailMessengerInterface) {
+                continue;
+            } else {
+                $observer->update($this);
+            }
+        }
+    }
 }
+
+// separate observers
+interface FileLoggerInterface{}
+class FileLogger implements \SplObserver, FileLoggerInterface
+{
+
+    private string $loggerPath;
+    private SplSubject $subject;
+
+    public function __construct(string $loggerPath) {
+        $this->loggerPath = $loggerPath;
+
+        if (!($this->loggerPath)) {
+            throw new RuntimeException("Data store file $loggerPath cannot be null.");
+        }
+
+        if (file_exists($loggerPath) && !is_writable($this->loggerPath)) {
+            throw new RuntimeException("Data store file $loggerPath must be writable.");
+        }
+    }
+
+    public function update(SplSubject $subject): void
+    {
+        echo 'em::update::FileLogger' . "\n";
+
+        $this->subject = $subject;
+        $this->save();
+    }
+
+
+    private function save(): void
+    {
+        $result = file_put_contents
+        (
+            $this->loggerPath,
+            json_encode($this->subject->updateResult).PHP_EOL , FILE_APPEND
+        );
+        if ($result === null) {
+            throw new RuntimeException("Write of data store file $this->loggerPath failed.");
+        }
+    }
+}
+
+// separate observers
+interface MailMessengerInterface{}
+
+class MailMessenger implements \SplObserver, MailMessengerInterface
+{
+
+    private const MAIL_TO = 'mailto@hostwhere.com';
+    private const QOH_DIPS_FIVE = 'qoh dips five';
+    private const MAIL_HEADER = [
+        'From' => 'webmaster@hostwhere.com',
+        'Reply-To' => 'webmaster@hostwhere.com',
+        'X-Mailer' => 'PHP'
+    ];
+    private string $loggerPath;
+    private SplSubject $subject;
+
+    public function __construct(string $loggerPath) {
+        $this->loggerPath = $loggerPath;
+
+        if (!($this->loggerPath)) {
+            throw new RuntimeException("Data store file $loggerPath cannot be null.");
+        }
+
+        if (file_exists($loggerPath) && !is_writable($this->loggerPath)) {
+            throw new RuntimeException("Data store file $loggerPath must be writable.");
+        }
+    }
+
+    public function update(SplSubject $subject): void
+    {
+        echo 'em::update::MailMessenger' . "\n";
+
+        $this->subject = $subject;
+        $this->save();
+    }
+
+    private function save(): void
+    {
+        $message = wordwrap(serialize([
+                                          'sku' => $this->subject->updateResult['sku'],
+                                          'qoh' => $this->subject->updateResult['qoh'],
+                                      ])
+            , 70, "\r\n");
+        mail(self::MAIL_TO, self::QOH_DIPS_FIVE, $message, self::MAIL_HEADER);
+
+        // see sent message contents
+        $result = file_put_contents
+        (
+            $this->loggerPath,
+            serialize([
+                          'sku' => $this->subject->updateResult['sku'],
+                          'qoh' => $this->subject->updateResult['qoh'],
+                      ]) .PHP_EOL, FILE_APPEND
+        );
+        if ($result === null) {
+            throw new RuntimeException("Write of data store file $this->loggerPath failed.");
+        }
+
+    }
+}
+
+
 
 //An example entity, which some business logic.  we can tell inventory items that they have shipped or been received
 //in
@@ -374,10 +515,17 @@ class InventoryItem extends Entity
 function driver()
 {
     $dataStorePath =__DIR__ . '/../../public/data_store_file.data';
+    $dataLoggerPath =__DIR__ . '/../../public/logger_file.data';
     $entityManager = new EntityManager($dataStorePath);
 
-    Entity::setDefaultEntityManager($entityManager);
+    $fileLogger = new FileLogger($dataLoggerPath);
+    $entityManager->attach($fileLogger);
 
+    $mailMessenger =  new MailMessenger($dataLoggerPath);
+    $entityManager->attach($mailMessenger);
+
+    Entity::setDefaultEntityManager($entityManager);
+//
     //create five new Inventory items
     /** @var InventoryItem $item1 */
     $item1 = Entity::getEntity(
@@ -411,6 +559,7 @@ function driver()
     $entityManager->updateStore();
 
 
+    // start comment below if run app directly php source.php
     try {
         assertEquals(4, $item1->qoh, "asserted value of QOH cannot be other than 4");
     } catch (RuntimeException $r)
@@ -460,6 +609,7 @@ function driver()
     {
         echo $r->getMessage();
     }
+    // stop comment above if run app directly php source.php
 }
 
 driver();
